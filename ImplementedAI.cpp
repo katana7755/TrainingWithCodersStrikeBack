@@ -5,11 +5,19 @@
 #include <cmath>
 #include <chrono>
 
+#define MAX_LAP_NUMBER 3
+
 using namespace std;
 
 /**
 * Utility functions & classes
 **/
+
+struct Vector2
+{
+    float m_X;
+    float m_Y;
+};
 
 class MathHelper
 {
@@ -27,6 +35,27 @@ public:
     static bool isApproximatelyOne(float t)
     {
         return t > 0.999f;
+    }
+
+    static float getMagnitude(Vector2 vec)
+    {
+        return sqrt(vec.m_X * vec.m_X + vec.m_Y * vec.m_Y);
+    }
+
+    static Vector2 divide(Vector2 vec, float divider)
+    {
+        return Vector2 {vec.m_X / divider, vec.m_Y / divider };
+    }
+
+    static Vector2 getNormalizedVector(int x, int y)
+    {
+        auto vec = Vector2 { (float)x, (float)y };
+        return divide(vec, getMagnitude(vec));
+    }
+
+    static float dotProduct(Vector2 vec1, Vector2 vec2)
+    {
+        return (vec1.m_X * vec2.m_X + vec1.m_Y * vec2.m_Y);
     }
 };
 
@@ -60,6 +89,79 @@ private:
 chrono::time_point<chrono::steady_clock> TimeManager::s_LastCheckedTime;
 float TimeManager::s_DeltaTime;
 
+struct MapPoint
+{
+    int m_X;
+    int m_Y;    
+
+    bool operator==(const MapPoint& rhs) const
+    {
+        return m_X == rhs.m_X && m_Y == rhs.m_Y;
+    }
+};
+
+class CarState
+{
+public:
+    CarState()
+    {        
+        m_BoostCount = 1;
+    }
+
+public:
+    void setPosition(int x, int y)
+    {   
+        if (m_HasPosSet)    
+        {   
+            m_Dir = Vector2 { (float)(x - m_Pos.m_X), (float)(y - m_Pos.m_Y) };
+            m_Speed = MathHelper::getMagnitude(m_Dir) / TimeManager::getDeltaTime();
+            m_Speed = max(m_Speed, 0.001f);
+            m_Dir = MathHelper::divide(m_Dir, m_Speed);
+        }
+        else
+        {
+            m_HasPosSet = true;
+            m_Dir = Vector2 { 0.0f, 0.0f };
+            m_Speed = 0.0f;            
+        }
+
+        m_Pos = MapPoint { x, y };
+    }
+
+    float getSpeed()
+    {
+        return m_Speed;
+    }
+
+    void makeDecision(int checkPointX, int checkPointY, float distanceToNextCheckpoint, float angleToNextCheckpoint, int& outTargetX, int& outTargetY, string& outTargetAction)
+    {
+        outTargetX = checkPointX;
+        outTargetY = checkPointY;
+
+        float dirFactor = clamp(abs(angleToNextCheckpoint) / 90.0f, 0.0f, 1.0f);
+        float distFactor = clamp(distanceToNextCheckpoint / max(m_Speed * 0.2f, 0.01f), 0.0f, 1.0f);
+
+        // Use boost when the count is at least 1, the orientation is facing the target, and distance is far enough
+        if (m_BoostCount > 0 && MathHelper::isApproximatelyZero(dirFactor) && MathHelper::isApproximatelyOne(distFactor) && m_Speed > 8000.0f)
+        {
+            --m_BoostCount;   
+            outTargetAction = "BOOST";
+        }
+        else 
+        {        
+            int thrust = (int)(70.0f * distFactor) + (int)(30.0f * clamp(1.1f - dirFactor, 0.0f, 1.0f));
+            outTargetAction = to_string(thrust);
+        }                
+    }
+
+private:
+    bool m_HasPosSet = false;
+    int m_BoostCount;
+    MapPoint m_Pos;
+    Vector2 m_Dir;
+    float m_Speed;
+};
+
 /**
  * Auto-generated code below aims at helping you parse
  * the standard input according to the problem statement.
@@ -71,6 +173,7 @@ int main()
     bool isInitialized = false;
     int lastX, lastY;
     TimeManager::initialize();
+    CarState myCarState;
 
     // game loop
     while (1) {
@@ -90,44 +193,17 @@ int main()
         cerr << "distance to the next target: " << nextCheckpointDist << endl;
 
         TimeManager::update();
+        myCarState.setPosition(x, y);
 
-        float speed = 0.0f;
+        cerr << "speed: " << myCarState.getSpeed() << endl;
 
-        if (isInitialized)
-        {
-            float xx = (x - lastX) * (x - lastX);
-            float yy = (y - lastY) * (y - lastY);
-            speed = sqrt(xx + yy) / TimeManager::getDeltaTime();
-        }
-        else
-        {   
-            isInitialized = true;         
-        }
-
-        cerr << "speed: " << speed << endl;
-
-        lastX = x;
-        lastY = y;
-
-        float dirFactor = clamp(abs(nextCheckpointAngle) / 90.0f, 0.0f, 1.0f);
-        float distFactor = clamp(nextCheckpointDist / max(speed * 0.1f, 0.01f), 0.0f, 1.0f);
-        string strControl;
-
-        // Use boost when the count is at least 1, the orientation is facing the target, and distance is far enough
-        if (boostCount > 0 && MathHelper::isApproximatelyZero(dirFactor) && MathHelper::isApproximatelyOne(distFactor) && speed > 8000.0f)
-        {
-            --boostCount;   
-            strControl = "BOOST";
-        }
-        else 
-        {        
-            int thrust = (int)(80.0f * distFactor) + (int)(20.0f * clamp(1.1f - dirFactor, 0.0f, 1.0f));
-            strControl = to_string(thrust);
-        }
+        int targetX, targetY;
+        string targetAction;
+        myCarState.makeDecision(nextCheckpointX, nextCheckpointY, nextCheckpointDist, nextCheckpointAngle, targetX, targetY, targetAction);
 
         // You have to output the target position
         // followed by the power (0 <= thrust <= 100)
         // i.e.: "x y thrust"
-        cout << nextCheckpointX << " " << nextCheckpointY << " " << strControl << endl;
+        cout << targetX << " " << targetY << " " << targetAction << endl;
     }
 }
