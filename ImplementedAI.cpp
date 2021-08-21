@@ -6,6 +6,7 @@
 #include <chrono>
 
 #define MAX_LAP_NUMBER 3
+#define MATH_PI 3.14159265f
 
 using namespace std;
 
@@ -17,6 +18,22 @@ struct Vector2
 {
     float m_X;
     float m_Y;
+};
+
+struct MapPoint
+{
+    int m_X;
+    int m_Y;    
+
+    bool operator==(const MapPoint& rhs) const
+    {
+        return m_X == rhs.m_X && m_Y == rhs.m_Y;
+    }
+
+    bool operator!=(const MapPoint& rhs) const
+    {
+        return m_X != rhs.m_X || m_Y != rhs.m_Y;
+    }    
 };
 
 class MathHelper
@@ -42,9 +59,19 @@ public:
         return sqrt(vec.m_X * vec.m_X + vec.m_Y * vec.m_Y);
     }
 
+    static Vector2 plus(Vector2 vec1, Vector2 vec2)
+    {        
+        return Vector2 { vec1.m_X + vec2.m_X, vec1.m_Y + vec2.m_Y };
+    }
+
     static Vector2 minus(Vector2 vec1, Vector2 vec2)
     {        
         return Vector2 { vec1.m_X - vec2.m_X, vec1.m_Y - vec2.m_Y };
+    }
+
+    static Vector2 multiply(Vector2 vec, float multiply)
+    {
+        return Vector2 {vec.m_X * multiply, vec.m_Y * multiply };
     }
 
     static Vector2 divide(Vector2 vec, float divider)
@@ -57,6 +84,11 @@ public:
         auto vec = Vector2 { (float)x, (float)y };
         return divide(vec, getMagnitude(vec));
     }
+
+    static Vector2 getNormalizedVector(Vector2 vec)
+    {
+        return divide(vec, getMagnitude(vec));
+    }    
 
     static float dotProduct(Vector2 vec1, Vector2 vec2)
     {
@@ -98,22 +130,6 @@ private:
 
 chrono::time_point<chrono::steady_clock> TimeManager::s_LastCheckedTime;
 float TimeManager::s_DeltaTime;
-
-struct MapPoint
-{
-    int m_X;
-    int m_Y;    
-
-    bool operator==(const MapPoint& rhs) const
-    {
-        return m_X == rhs.m_X && m_Y == rhs.m_Y;
-    }
-
-    bool operator!=(const MapPoint& rhs) const
-    {
-        return m_X != rhs.m_X || m_Y != rhs.m_Y;
-    }    
-};
 
 struct Circuit
 {    
@@ -219,29 +235,14 @@ public:
         return (s_CurrentLapNumber >= MAX_LAP_NUMBER && s_CurrentCheckPointIndex == s_CurrentCircuit.m_Checkpoints.size() - 1);
     }
 
-    static float getCornerFactor(MapPoint m_Pos)
+    static bool isLastLap()
     {        
-        if (s_IsAnalyzed == false)
-        {
-            return 0.7f; // some conservative number?
-        }
-        else if (isTargettingLastCheckpoint())
-        {
-            return 1.0f; // no expecting corner at the last target
-        }
-
-        auto currentTargetPoint = s_CurrentCircuit.m_Checkpoints[s_CurrentCheckPointIndex];
-        auto nextTargetPoint = s_CurrentCircuit.m_Checkpoints[(s_CurrentCheckPointIndex + 1) % s_CurrentCircuit.m_Checkpoints.size()];
-        auto dirToCurrent = MathHelper::getNormalizedVector(currentTargetPoint.m_X - m_Pos.m_X, currentTargetPoint.m_Y - m_Pos.m_Y);
-        auto dirToNext = MathHelper::getNormalizedVector(nextTargetPoint.m_X - currentTargetPoint.m_X, nextTargetPoint.m_Y - currentTargetPoint.m_Y);
-        float factor = MathHelper::dotProduct(dirToCurrent, dirToNext);
-
-        return factor * 0.5f + 0.5f;
+        return s_CurrentLapNumber >= MAX_LAP_NUMBER;
     }
 
-    static MapPoint getNextCheckpoint()
+    static MapPoint getCheckpointFromCurrent(int step)
     {        
-        return s_CurrentCircuit.m_Checkpoints[(s_CurrentCheckPointIndex + 1) % s_CurrentCircuit.m_Checkpoints.size()];
+        return s_CurrentCircuit.m_Checkpoints[(s_CurrentCheckPointIndex + step + s_CurrentCircuit.m_Checkpoints.size()) % s_CurrentCircuit.m_Checkpoints.size()];
     }
 
     static void printCircuit()
@@ -280,127 +281,127 @@ int CircuitManager::s_CurrentLapNumber;
 int CircuitManager::s_CurrentCheckPointIndex;
 vector<Circuit> CircuitManager::s_PossibleCircuitList = 
 {
-    Circuit 
-    {
-        {
-            MapPoint { 7282, 6658 },
-            MapPoint { 5424, 2828 },
-            MapPoint { 10338, 3358 },
-            MapPoint { 11174, 5407 },
-        }
-    },
-    Circuit 
-    {
-        {
-            MapPoint { 10587, 5059 },
-            MapPoint { 13109, 2300 },
-            MapPoint { 4570, 2154 },
-            MapPoint { 7325, 4930 },
-            MapPoint { 3315, 7214 },
-            MapPoint { 14563, 7710 },
-        }
-    },  
-    Circuit 
-    {
-        {
-            MapPoint { 9101, 1854 },
-            MapPoint { 5025, 5238 },
-            MapPoint { 11459, 6081 },
-        }
-    },      
-	Circuit
-	{
-		{
-			MapPoint { 13591, 7574 },
-			MapPoint { 12454, 1320 },
-			MapPoint { 10535, 5986 },
-			MapPoint { 3596, 5175 },
-		}
-	},     
-    Circuit
-	{
-		{
-			MapPoint { 10570, 5960 },
-			MapPoint { 3565, 5161 },
-			MapPoint { 13563, 7587 },
-			MapPoint { 12481, 1323 },
-		}
-	},
-	Circuit
-	{
-		{
-			MapPoint { 13482, 2346 },
-			MapPoint { 12922, 7204 },
-			MapPoint { 5653, 2562 },
-			MapPoint { 4101, 7426 },
-		}
-	},    
-	Circuit
-	{
-		{
-			MapPoint { 9575, 1428 },
-			MapPoint { 3635, 4436 },
-			MapPoint { 7970, 7901 },
-			MapPoint { 13326, 5531 },
-		}
-	},    
-	Circuit
-	{
-		{
-			MapPoint { 7264, 6676 },
-			MapPoint { 5451, 2814 },
-			MapPoint { 10324, 3351 },
-			MapPoint { 11225, 5442 },
-		}
-	},   
-	Circuit
-	{
-		{
-			MapPoint { 14688, 1381 },
-			MapPoint { 3426, 7213 },
-			MapPoint { 9435, 7216 },
-			MapPoint { 5993, 4263 },
-		}
-	},     
-	Circuit
-	{
-		{
-			MapPoint { 8000, 7917 },
-			MapPoint { 13281, 5533 },
-			MapPoint { 9549, 1398 },
-			MapPoint { 3646, 4448 },
-		}
-	},  
-	Circuit
-	{
-		{
-			MapPoint { 3621, 5263 },
-			MapPoint { 13855, 5072 },
-			MapPoint { 10670, 2299 },
-			MapPoint { 8686, 7431 },
-			MapPoint { 7188, 2161 },
-		}
-	},   
-	Circuit
-	{
-		{
-			MapPoint { 11195, 5453 },
-			MapPoint { 7287, 6654 },
-			MapPoint { 5438, 2822 },
-			MapPoint { 10320, 3369 },
-		}
-	},       
-	Circuit
-	{
-		{
-			MapPoint { 7642, 5958 },
-			MapPoint { 3128, 7536 },
-			MapPoint { 9491, 4368 },
-			MapPoint { 14533, 7805 },
-			MapPoint { 6313, 4262 },
-			MapPoint { 7798, 884 },
-		}
-	},    
+    // Circuit 
+    // {
+    //     {
+    //         MapPoint { 7282, 6658 },
+    //         MapPoint { 5424, 2828 },
+    //         MapPoint { 10338, 3358 },
+    //         MapPoint { 11174, 5407 },
+    //     }
+    // },
+    // Circuit 
+    // {
+    //     {
+    //         MapPoint { 10587, 5059 },
+    //         MapPoint { 13109, 2300 },
+    //         MapPoint { 4570, 2154 },
+    //         MapPoint { 7325, 4930 },
+    //         MapPoint { 3315, 7214 },
+    //         MapPoint { 14563, 7710 },
+    //     }
+    // },  
+    // Circuit 
+    // {
+    //     {
+    //         MapPoint { 9101, 1854 },
+    //         MapPoint { 5025, 5238 },
+    //         MapPoint { 11459, 6081 },
+    //     }
+    // },      
+	// Circuit
+	// {
+	// 	{
+	// 		MapPoint { 13591, 7574 },
+	// 		MapPoint { 12454, 1320 },
+	// 		MapPoint { 10535, 5986 },
+	// 		MapPoint { 3596, 5175 },
+	// 	}
+	// },     
+    // Circuit
+	// {
+	// 	{
+	// 		MapPoint { 10570, 5960 },
+	// 		MapPoint { 3565, 5161 },
+	// 		MapPoint { 13563, 7587 },
+	// 		MapPoint { 12481, 1323 },
+	// 	}
+	// },
+	// Circuit
+	// {
+	// 	{
+	// 		MapPoint { 13482, 2346 },
+	// 		MapPoint { 12922, 7204 },
+	// 		MapPoint { 5653, 2562 },
+	// 		MapPoint { 4101, 7426 },
+	// 	}
+	// },    
+	// Circuit
+	// {
+	// 	{
+	// 		MapPoint { 9575, 1428 },
+	// 		MapPoint { 3635, 4436 },
+	// 		MapPoint { 7970, 7901 },
+	// 		MapPoint { 13326, 5531 },
+	// 	}
+	// },    
+	// Circuit
+	// {
+	// 	{
+	// 		MapPoint { 7264, 6676 },
+	// 		MapPoint { 5451, 2814 },
+	// 		MapPoint { 10324, 3351 },
+	// 		MapPoint { 11225, 5442 },
+	// 	}
+	// },   
+	// Circuit
+	// {
+	// 	{
+	// 		MapPoint { 14688, 1381 },
+	// 		MapPoint { 3426, 7213 },
+	// 		MapPoint { 9435, 7216 },
+	// 		MapPoint { 5993, 4263 },
+	// 	}
+	// },     
+	// Circuit
+	// {
+	// 	{
+	// 		MapPoint { 8000, 7917 },
+	// 		MapPoint { 13281, 5533 },
+	// 		MapPoint { 9549, 1398 },
+	// 		MapPoint { 3646, 4448 },
+	// 	}
+	// },  
+	// Circuit
+	// {
+	// 	{
+	// 		MapPoint { 3621, 5263 },
+	// 		MapPoint { 13855, 5072 },
+	// 		MapPoint { 10670, 2299 },
+	// 		MapPoint { 8686, 7431 },
+	// 		MapPoint { 7188, 2161 },
+	// 	}
+	// },   
+	// Circuit
+	// {
+	// 	{
+	// 		MapPoint { 11195, 5453 },
+	// 		MapPoint { 7287, 6654 },
+	// 		MapPoint { 5438, 2822 },
+	// 		MapPoint { 10320, 3369 },
+	// 	}
+	// },       
+	// Circuit
+	// {
+	// 	{
+	// 		MapPoint { 7642, 5958 },
+	// 		MapPoint { 3128, 7536 },
+	// 		MapPoint { 9491, 4368 },
+	// 		MapPoint { 14533, 7805 },
+	// 		MapPoint { 6313, 4262 },
+	// 		MapPoint { 7798, 884 },
+	// 	}
+	// },    
 };
 
 class CarState
@@ -423,7 +424,7 @@ public:
             m_Dir = Vector2 { (float)(x - m_Pos.m_X), (float)(y - m_Pos.m_Y) };
             m_Speed = MathHelper::getMagnitude(m_Dir) / TimeManager::getDeltaTime();
             m_Speed = max(m_Speed, 0.001f);
-            m_Dir = MathHelper::divide(m_Dir, m_Speed);
+            m_Dir = MathHelper::getNormalizedVector(m_Dir);
             m_AngularSpeed = MathHelper::getAngle(MathHelper::minus(m_Dir, prevDir)) / TimeManager::getDeltaTime();
             m_MaxSpeed = max(m_MaxSpeed, m_Speed);
             m_MaxAngularSpeed = max(m_MaxAngularSpeed, abs(m_AngularSpeed));
@@ -463,49 +464,79 @@ public:
 
     void makeDecision(int checkPointX, int checkPointY, float distanceToNextCheckpoint, float angleToNextCheckpoint, int& outTargetX, int& outTargetY, string& outTargetAction)
     {
+        float minThrust = 10.0f;
+        float maxThrust = 100.0f;
         float distFactor = 0.0f;
-        float dirFactor = 0.0f;
-        float cornerFactor = 0.0f;
         bool isNext = false;
 
         if (m_IsControllable)
         {
             outTargetX = checkPointX;
             outTargetY = checkPointY;
+            distFactor = max(distanceToNextCheckpoint * cos(angleToNextCheckpoint / 180.0f * MATH_PI), 0.0f);
+            distFactor = (m_Speed > 0.001f) ? clamp(distFactor / (m_Speed * 10.0f), 0.0f, 1.0f) : 1.0f;
 
-            //distFactor = clamp(distanceToNextCheckpoint / max(m_Speed * 10.0f, 0.01f), 0.0f, 1.0f);
-            distFactor = (distanceToNextCheckpoint > 1000.0) ? 1.0f : clamp(distanceToNextCheckpoint / (m_Speed * 10.0f), 0.0f, 1.0f);
-            dirFactor = clamp(abs(angleToNextCheckpoint) / 90.0f, 0.0f, 1.0f);
+            MapPoint currentCheckpoint = MapPoint { checkPointX, checkPointY };
+            Vector2 toCurrent = MathHelper::getNormalizedVector(currentCheckpoint.m_X - m_Pos.m_X, currentCheckpoint.m_Y - m_Pos.m_Y);
 
-            if (CircuitManager::hasAnalyzeDone() && !CircuitManager::isTargettingLastCheckpoint() && distanceToNextCheckpoint < (m_Speed * 10.0f) && dirFactor < 0.15f)
-            {              
-                auto nextPoint = CircuitManager::getNextCheckpoint();
-                outTargetX = nextPoint.m_X;
-                outTargetY = nextPoint.m_Y;
-                isNext = true;
+            if (CircuitManager::hasAnalyzeDone() && !CircuitManager::isTargettingLastCheckpoint())
+            {   
+                MapPoint nextCheckpoint = MapPoint { checkPointX, checkPointY };
+                float movementCosine = max(MathHelper::dotProduct(m_Dir, toCurrent), 0.0f);
+
+                if (movementCosine > cos(MATH_PI * 30.0f / 180.0f) && distanceToNextCheckpoint < (m_Speed * 10.0f))
+                {                    
+                    isNext = true;
+                    currentCheckpoint = CircuitManager::getCheckpointFromCurrent(1);
+                    nextCheckpoint = CircuitManager::getCheckpointFromCurrent(2);
+                    toCurrent = MathHelper::getNormalizedVector(currentCheckpoint.m_X - m_Pos.m_X, currentCheckpoint.m_Y - m_Pos.m_Y);
+
+                    auto diff = Vector2 { (float)(currentCheckpoint.m_X - m_Pos.m_X), (float)(currentCheckpoint.m_Y - m_Pos.m_Y) };
+                    distanceToNextCheckpoint = MathHelper::getMagnitude(diff);
+                    distFactor = max(distanceToNextCheckpoint * MathHelper::dotProduct(m_Dir, toCurrent), 0.0f);
+                    distFactor = (m_Speed > 0.001f) ? clamp(distFactor / (m_Speed * 10.0f), 0.0f, 1.0f) : 1.0f;                    
+                }
+                else
+                {
+                    nextCheckpoint = CircuitManager::getCheckpointFromCurrent(1);
+                }
+
+                auto toCurrentHalf = MathHelper::plus(toCurrent, m_Dir);
+                toCurrentHalf = MathHelper::getNormalizedVector(toCurrent);
+                Vector2 toNext = MathHelper::getNormalizedVector(nextCheckpoint.m_X - currentCheckpoint.m_X, nextCheckpoint.m_Y - currentCheckpoint.m_Y);
+                minThrust = max(MathHelper::dotProduct(toCurrentHalf, toNext) * maxThrust, 0.0f);
             }            
 
-            // Use boost when the count is at least 1, the orientation is facing the target, and distance is far enough
-            if (m_BoostCount > 0 && MathHelper::isApproximatelyZero(dirFactor) && (CircuitManager::isTargettingLastCheckpoint() || (MathHelper::isApproximatelyOne(distFactor) && distanceToNextCheckpoint > 1000.0f)))
+            // Use boost in the last lap
+            if (m_BoostCount > 0 && CircuitManager::isLastLap() && distFactor > 0.8f && abs(angleToNextCheckpoint) < 10)
             {
+                cerr << "BOOST!!!!!!!!!!!!!!!!!!!!!!!" << endl;
                 --m_BoostCount;   
                 outTargetAction = "BOOST";
             }
             else 
             {        
-                //int thrust = (int)(100.0f * ((1.0f - cornerFactor) * distFactor + cornerFactor) * clamp(1.0f - dirFactor, 0.0f, 1.0f));
-                int thrust = (int)(100.0f * distFactor * clamp(1.0f - dirFactor, 0.0f, 1.0f));
+                int thrust = minThrust + (maxThrust - minThrust) * distFactor;
                 outTargetAction = to_string(thrust);
-            }                
+            }    
+
+            // Calibrate target position
+            auto adjustment = MathHelper::minus(MathHelper::multiply(toCurrent, MathHelper::dotProduct(m_Dir, toCurrent)), m_Dir);
+            adjustment = MathHelper::multiply(adjustment, m_Speed * 10.0);
+            outTargetX = currentCheckpoint.m_X + adjustment.m_X;
+            outTargetY = currentCheckpoint.m_Y + adjustment.m_Y;             
         }
 
         cerr << endl;
         cerr << "[" << m_Name << "]" << endl;
+        cerr << "inputs: " << distanceToNextCheckpoint << ", " << angleToNextCheckpoint << endl;
+        cerr << "dir: " << m_Dir.m_X << ", " << m_Dir.m_Y << endl;
         cerr << "boostCnt: " << m_BoostCount << endl;
         cerr << "speed: (" << m_Speed << " / " << m_MaxSpeed << ")" << endl;
         cerr << "angularSpeed: (" << m_AngularSpeed << " / " << m_MaxAngularSpeed << ")" << endl;
-        cerr << "factors: " << dirFactor << ", " << distFactor << ", " << cornerFactor << endl;
+        cerr << "factors: " << distFactor << endl;
         cerr << "isNext: " << isNext << endl;
+        cerr << "thrust range: " << minThrust << " ~ " << maxThrust << endl;
     }
 
 private:
