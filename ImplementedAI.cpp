@@ -5,8 +5,8 @@
 #include <cmath>
 #include <chrono>
 
-#define MAX_LAP_NUMBER 3
 #define MATH_PI 3.14159265f
+#define CAR_COUNT_PER_TEAM 2
 
 using namespace std;
 
@@ -78,7 +78,7 @@ struct Vector2
 
     Vector2 getNormalized()
     {
-        return (*this) / this->getMagnitude();
+        return (this->getMagnitude() > 0.001f) ? (*this) / this->getMagnitude() : (*this);
     }       
 
     float getTangentAngle()
@@ -199,52 +199,23 @@ private:
 public:
     static void initialize()
     {
-        s_CurrentLapNumber = 1;
     }
 
-    static void updateCheckpoint(int x, int y)
-    {     
-        auto checkPoint = MapPoint { x, y };
-        auto it = find(s_CurrentCircuit.m_Checkpoints.begin(), s_CurrentCircuit.m_Checkpoints.end(), checkPoint);
+    static void setMaxLapNumber(int maxLabNumber)
+    {
+        s_MaxLabNumber = maxLabNumber;
+    }
 
-        if (it != s_CurrentCircuit.m_Checkpoints.end())
-        {
-            int index = distance(s_CurrentCircuit.m_Checkpoints.begin(), it);
+    static void registerCircuit(const Circuit& circuit)
+    {
+        s_CurrentCircuit = circuit;
+        s_IsAnalyzed = true;
+    }
 
-            if (index != s_CurrentCheckPointIndex)
-            {
-                s_IsAnalyzed = true;            
-                s_CurrentCheckPointIndex = index;
-                s_CurrentLapNumber = (s_CurrentCheckPointIndex == 0) ? s_CurrentLapNumber + 1 : s_CurrentLapNumber;
-            }
-        }
-        else
-        {
-            s_CurrentCheckPointIndex = s_CurrentCircuit.m_Checkpoints.size();
-            s_CurrentCircuit.m_Checkpoints.push_back(checkPoint);
-
-            if (s_PossibleCircuitList.size() > 0)
-            {
-                auto iter = --s_PossibleCircuitList.end();
-                int size = s_PossibleCircuitList.size();
-
-                for (int i = 0; i < size; ++i, --iter)
-                {
-                    if (!iter->isPotentiallyIdentical(s_CurrentCircuit))
-                    {
-                        s_PossibleCircuitList.erase(iter);
-                    }
-                }
-
-                if (s_PossibleCircuitList.size() == 1)
-                {
-                    s_CurrentCircuit.copyFrom(s_PossibleCircuitList[0]);
-                    s_IsAnalyzed = true;
-                }
-            }
-        }
-
-        cerr << "CircuitManager: " << s_CurrentCheckPointIndex << ", " << s_CurrentLapNumber << endl;
+    static MapPoint getCheckpoint(int checkpointIndex)
+    {
+        int safeIndex = (checkpointIndex + s_CurrentCircuit.m_Checkpoints.size()) % s_CurrentCircuit.m_Checkpoints.size();
+        return s_CurrentCircuit.m_Checkpoints[safeIndex];
     }
 
     static bool hasAnalyzeDone()
@@ -252,216 +223,67 @@ public:
         return s_IsAnalyzed;     
     }
 
-    static bool isTargettingLastCheckpoint()
+    static bool isLastCheckpoint(int checkpointIndex)
     {
-        return (s_CurrentLapNumber >= MAX_LAP_NUMBER && s_CurrentCheckPointIndex == s_CurrentCircuit.m_Checkpoints.size() - 1);
+        return (checkpointIndex == s_CurrentCircuit.m_Checkpoints.size() - 1);
     }
 
-    static bool isLastLap()
+    static bool isLastLap(int lapNumber)
     {        
-        return s_CurrentLapNumber >= MAX_LAP_NUMBER;
-    }
-
-    static MapPoint getCheckpointFromCurrent(int step)
-    {        
-        return s_CurrentCircuit.m_Checkpoints[(s_CurrentCheckPointIndex + step + s_CurrentCircuit.m_Checkpoints.size()) % s_CurrentCircuit.m_Checkpoints.size()];
-    }
-
-    static void printCircuit()
-    {
-        if (s_IsAnalyzed == false)
-        {
-            return;
-        }
-
-        cerr << endl;
-        cerr << "[Analyzed Circuit]" << endl;
-        cerr << "\tCircuit" << endl;
-        cerr << "\t{" << endl;
-        cerr << "\t\t{" << endl;
-
-        for (auto point : s_CurrentCircuit.m_Checkpoints)
-        {
-            cerr << "\t\t\tMapPoint { " << point.m_X << ", " << point.m_Y << " }," <<endl;
-        }
-
-        cerr << "\t\t}" << endl;
-        cerr << "\t}," << endl;
+        return lapNumber >= s_MaxLabNumber;
     }
 
 private:
     static Circuit s_CurrentCircuit;
     static bool s_IsAnalyzed;
-    static int s_CurrentLapNumber;
-    static int s_CurrentCheckPointIndex;
-    static vector<Circuit> s_PossibleCircuitList;
+    static int s_MaxLabNumber;
 };
 
 Circuit CircuitManager::s_CurrentCircuit;
-bool CircuitManager::s_IsAnalyzed;
-int CircuitManager::s_CurrentLapNumber;
-int CircuitManager::s_CurrentCheckPointIndex;
-vector<Circuit> CircuitManager::s_PossibleCircuitList = 
-{
-    // Circuit 
-    // {
-    //     {
-    //         MapPoint { 7282, 6658 },
-    //         MapPoint { 5424, 2828 },
-    //         MapPoint { 10338, 3358 },
-    //         MapPoint { 11174, 5407 },
-    //     }
-    // },
-    // Circuit 
-    // {
-    //     {
-    //         MapPoint { 10587, 5059 },
-    //         MapPoint { 13109, 2300 },
-    //         MapPoint { 4570, 2154 },
-    //         MapPoint { 7325, 4930 },
-    //         MapPoint { 3315, 7214 },
-    //         MapPoint { 14563, 7710 },
-    //     }
-    // },  
-    // Circuit 
-    // {
-    //     {
-    //         MapPoint { 9101, 1854 },
-    //         MapPoint { 5025, 5238 },
-    //         MapPoint { 11459, 6081 },
-    //     }
-    // },      
-	// Circuit
-	// {
-	// 	{
-	// 		MapPoint { 13591, 7574 },
-	// 		MapPoint { 12454, 1320 },
-	// 		MapPoint { 10535, 5986 },
-	// 		MapPoint { 3596, 5175 },
-	// 	}
-	// },     
-    // Circuit
-	// {
-	// 	{
-	// 		MapPoint { 10570, 5960 },
-	// 		MapPoint { 3565, 5161 },
-	// 		MapPoint { 13563, 7587 },
-	// 		MapPoint { 12481, 1323 },
-	// 	}
-	// },
-	// Circuit
-	// {
-	// 	{
-	// 		MapPoint { 13482, 2346 },
-	// 		MapPoint { 12922, 7204 },
-	// 		MapPoint { 5653, 2562 },
-	// 		MapPoint { 4101, 7426 },
-	// 	}
-	// },    
-	// Circuit
-	// {
-	// 	{
-	// 		MapPoint { 9575, 1428 },
-	// 		MapPoint { 3635, 4436 },
-	// 		MapPoint { 7970, 7901 },
-	// 		MapPoint { 13326, 5531 },
-	// 	}
-	// },    
-	// Circuit
-	// {
-	// 	{
-	// 		MapPoint { 7264, 6676 },
-	// 		MapPoint { 5451, 2814 },
-	// 		MapPoint { 10324, 3351 },
-	// 		MapPoint { 11225, 5442 },
-	// 	}
-	// },   
-	// Circuit
-	// {
-	// 	{
-	// 		MapPoint { 14688, 1381 },
-	// 		MapPoint { 3426, 7213 },
-	// 		MapPoint { 9435, 7216 },
-	// 		MapPoint { 5993, 4263 },
-	// 	}
-	// },     
-	// Circuit
-	// {
-	// 	{
-	// 		MapPoint { 8000, 7917 },
-	// 		MapPoint { 13281, 5533 },
-	// 		MapPoint { 9549, 1398 },
-	// 		MapPoint { 3646, 4448 },
-	// 	}
-	// },  
-	// Circuit
-	// {
-	// 	{
-	// 		MapPoint { 3621, 5263 },
-	// 		MapPoint { 13855, 5072 },
-	// 		MapPoint { 10670, 2299 },
-	// 		MapPoint { 8686, 7431 },
-	// 		MapPoint { 7188, 2161 },
-	// 	}
-	// },   
-	// Circuit
-	// {
-	// 	{
-	// 		MapPoint { 11195, 5453 },
-	// 		MapPoint { 7287, 6654 },
-	// 		MapPoint { 5438, 2822 },
-	// 		MapPoint { 10320, 3369 },
-	// 	}
-	// },       
-	// Circuit
-	// {
-	// 	{
-	// 		MapPoint { 7642, 5958 },
-	// 		MapPoint { 3128, 7536 },
-	// 		MapPoint { 9491, 4368 },
-	// 		MapPoint { 14533, 7805 },
-	// 		MapPoint { 6313, 4262 },
-	// 		MapPoint { 7798, 884 },
-	// 	}
-	// },    
-};
+bool CircuitManager::s_IsAnalyzed ;
+int CircuitManager::s_MaxLabNumber;
 
 class CarState
 {
 public:
-    CarState(const char* name, bool isControllable)
+    CarState(string& name, bool isControllable)
     {        
-        m_HasPosSet = false;
         m_Name = name;
         m_BoostCount = 1;
         m_IsControllable = isControllable;
+        m_CurrentLapNumber = 1;
+        m_CurrentCheckpointIndex = -1;
+        m_Dir = Vector2{ 0.0f, 0.0f };
     }
 
 public:
-    void setPosition(int x, int y)
-    {   
-        if (m_HasPosSet)    
-        {   
-            auto prevDir = m_Dir;
-            m_Dir = Vector2 { (float)(x - m_Pos.m_X), (float)(y - m_Pos.m_Y) };
-            m_Speed = m_Dir.getMagnitude() / TimeManager::getDeltaTime();
-            m_Speed = max(m_Speed, 0.001f);
-            m_Dir = m_Dir.getNormalized();
-            m_AngularSpeed = (m_Dir - prevDir).getTangentAngle() / TimeManager::getDeltaTime();
-            m_MaxSpeed = max(m_MaxSpeed, m_Speed);
-            m_MaxAngularSpeed = max(m_MaxAngularSpeed, abs(m_AngularSpeed));
-        }
-        else
-        {
-            m_HasPosSet = true;
-            m_Dir = Vector2 { 0.0f, 0.0f };
-            m_Speed = 0.0f;  
-            m_AngularSpeed = 0.0f;          
-            m_MaxSpeed = 0.0f;
-            m_MaxAngularSpeed = 0.0f;
-        }
+    string& getName()
+    {
+        return m_Name;
+    }
 
+    void update(int x, int y, int vx, int vy, int facingAngle, int checkpointIndex)
+    {     
         m_Pos = MapPoint { x, y };
+
+        auto prevDir = m_Dir;
+        m_Dir = MapPoint { vx, vy }.toVector();
+        m_Speed = m_Dir.getMagnitude();
+        m_Dir = m_Dir.getNormalized();
+        m_AngularSpeed = (m_Dir - prevDir).getTangentAngle() / TimeManager::getDeltaTime();
+        m_MaxSpeed = max(m_MaxSpeed, m_Speed);
+        m_MaxAngularSpeed = max(m_MaxAngularSpeed, abs(m_AngularSpeed));
+        m_FancingAngle = facingAngle;
+
+        if (m_CurrentCheckpointIndex != checkpointIndex)
+        {   
+            if (checkpointIndex == 0)         
+            {                
+                ++m_CurrentLapNumber;
+            }
+            
+            m_CurrentCheckpointIndex = checkpointIndex;
+        }
     }
 
     float getSpeed()
@@ -484,43 +306,53 @@ public:
         return m_MaxAngularSpeed;
     }
 
-    void makeDecision(int checkPointX, int checkPointY, float distanceToNextCheckpoint, float angleToNextCheckpoint, int& outTargetX, int& outTargetY, string& outTargetAction)
+    int getCurrentLapNumber()
     {
+        return m_CurrentLapNumber;
+    }
+
+    int getCurrentCheckpointIndex()
+    {
+        return m_CurrentCheckpointIndex;
+    }
+
+    void makeDesicion(int& outTargetX, int& outTargetY, string& outTargetAction)
+    {        
         float minThrust = 10.0f;
         float maxThrust = 100.0f;
         float distFactor = 0.0f;
         bool isNext = false;
 
+        auto currentCheckpoint = CircuitManager::getCheckpoint(m_CurrentCheckpointIndex);
+        auto toCurrent = (currentCheckpoint - m_Pos).toVector();
+        float distanceToNextCheckpoint = toCurrent.getMagnitude();
+
+        toCurrent = toCurrent.getNormalized();
+        float angleToNextCheckpoint = toCurrent.getTangentAngle() - m_FancingAngle;
+
         if (m_IsControllable)
         {
-            outTargetX = checkPointX;
-            outTargetY = checkPointY;
+            outTargetX = currentCheckpoint.m_X;
+            outTargetY = currentCheckpoint.m_Y;
             distFactor = max(distanceToNextCheckpoint * cos(MathHelper::deg2rad(angleToNextCheckpoint)), 0.0f);
             distFactor = (m_Speed > 0.001f) ? clamp(distFactor / (m_Speed * 10.0f), 0.0f, 1.0f) : 1.0f;
 
-            MapPoint currentCheckpoint = MapPoint { checkPointX, checkPointY };
-            Vector2 toCurrent = (currentCheckpoint - m_Pos).toVector().getNormalized();
-
-            if (CircuitManager::hasAnalyzeDone() && !CircuitManager::isTargettingLastCheckpoint())
+            if (CircuitManager::hasAnalyzeDone() && !CircuitManager::isLastLap(m_CurrentLapNumber) && !CircuitManager::isLastCheckpoint(m_CurrentCheckpointIndex))
             {   
-                MapPoint nextCheckpoint = MapPoint { checkPointX, checkPointY };
+                auto nextCheckpoint = CircuitManager::getCheckpoint(m_CurrentCheckpointIndex + 1);
                 float movementCosine = max(Vector2::dotProduct(m_Dir, toCurrent), 0.0f);
 
                 if (movementCosine > cos(MathHelper::deg2rad(30.0f)) && distanceToNextCheckpoint < (m_Speed * 10.0f))
                 {                    
                     isNext = true;
-                    currentCheckpoint = CircuitManager::getCheckpointFromCurrent(1);
-                    nextCheckpoint = CircuitManager::getCheckpointFromCurrent(2);
+                    currentCheckpoint = CircuitManager::getCheckpoint(m_CurrentCheckpointIndex + 1);
+                    nextCheckpoint = CircuitManager::getCheckpoint(m_CurrentCheckpointIndex + 2);
                     toCurrent = (currentCheckpoint - m_Pos).toVector().getNormalized();
 
                     auto diff = (currentCheckpoint - m_Pos).toVector();
                     distanceToNextCheckpoint = diff.getMagnitude();
                     distFactor = max(distanceToNextCheckpoint * Vector2::dotProduct(m_Dir, toCurrent), 0.0f);
                     distFactor = (m_Speed > 0.001f) ? clamp(distFactor / (m_Speed * 10.0f), 0.0f, 1.0f) : 1.0f;                    
-                }
-                else
-                {
-                    nextCheckpoint = CircuitManager::getCheckpointFromCurrent(1);
                 }
 
                 auto halfVector = toCurrent + m_Dir;
@@ -530,7 +362,7 @@ public:
             }            
 
             // Use boost in the last lap
-            if (m_BoostCount > 0 && CircuitManager::isLastLap() && distFactor > 0.8f && abs(angleToNextCheckpoint) < 10)
+            if (m_BoostCount > 0 && CircuitManager::isLastLap(m_CurrentLapNumber) && distFactor > 0.8f && abs(angleToNextCheckpoint) < 10)
             {
                 cerr << "BOOST!!!!!!!!!!!!!!!!!!!!!!!" << endl;
                 --m_BoostCount;   
@@ -558,11 +390,10 @@ public:
         cerr << "angularSpeed: (" << m_AngularSpeed << " / " << m_MaxAngularSpeed << ")" << endl;
         cerr << "factors: " << distFactor << endl;
         cerr << "isNext: " << isNext << endl;
-        cerr << "thrust range: " << minThrust << " ~ " << maxThrust << endl;
+        cerr << "thrust range: " << minThrust << " ~ " << maxThrust << endl;        
     }
 
 private:
-    bool m_HasPosSet;
     int m_BoostCount;
     MapPoint m_Pos;
     Vector2 m_Dir;
@@ -572,6 +403,9 @@ private:
     float m_MaxAngularSpeed;
     string m_Name;
     bool m_IsControllable;
+    int m_CurrentLapNumber;
+    int m_CurrentCheckpointIndex;
+    float m_FancingAngle;
 };
 
 /**
@@ -586,43 +420,103 @@ int main()
     int lastX, lastY;
     TimeManager::initialize();
     CircuitManager::initialize();
-    CarState myCarState("MyCar", true);
-    CarState bossCarState("Boss", false);
+    CarState* myCarStatePtrs[CAR_COUNT_PER_TEAM];
+    CarState* bossCarStatePtrs[CAR_COUNT_PER_TEAM];
+
+    for (int i = 0; i < CAR_COUNT_PER_TEAM; ++i)
+    {
+        string myName = "MyCar " + to_string(i);
+        myCarStatePtrs[i] = new CarState(myName, true);
+
+        string bossName = "Boss " + to_string(i);
+        bossCarStatePtrs[i] = new CarState(bossName, false);
+    }
+
+    // initialization
+    {
+        int laps;
+        int checkpointCount;
+        cin >> laps; cin.ignore();
+        cin >> checkpointCount; cin.ignore();
+
+        cerr << "[Intiailization]" << endl;
+        cerr << "laps: " << laps << endl;
+        cerr << "checkpointCount: " << checkpointCount << endl;
+
+        Circuit circuit;
+        circuit.m_Checkpoints.reserve(checkpointCount);
+
+        for (int i = 0; i < checkpointCount; ++i)
+        {
+            int checkpointX, checkpointY;
+            cin >> checkpointX >> checkpointY; cin.ignore();
+            circuit.m_Checkpoints.push_back(MapPoint { checkpointX, checkpointY });
+
+            cerr << "\t" << i << " - " << checkpointX << ", " << checkpointY << endl;
+        }
+
+        CircuitManager::setMaxLapNumber(laps);
+        CircuitManager::registerCircuit(circuit);
+    }
 
     // game loop
-    while (1) {
-        int x;
-        int y;
-        int nextCheckpointX; // x position of the next check point
-        int nextCheckpointY; // y position of the next check point
-        int nextCheckpointDist; // distance to the next checkpoint
-        int nextCheckpointAngle; // angle between your pod orientation and the direction of the next checkpoint
-        cin >> x >> y >> nextCheckpointX >> nextCheckpointY >> nextCheckpointDist >> nextCheckpointAngle; cin.ignore();
-        int opponentX;
-        int opponentY;
-        cin >> opponentX >> opponentY; cin.ignore();
-
-        // Write an action using cout. DON'T FORGET THE "<< endl"
-        // To debug: cerr << "Debug messages..." << endl;
-        cerr << "distance to the next target: " << nextCheckpointDist << endl;
-
+    while (1) 
+    {
         TimeManager::update();
-        CircuitManager::updateCheckpoint(nextCheckpointX, nextCheckpointY);
-        myCarState.setPosition(x, y);
-        bossCarState.setPosition(opponentX, opponentY);
 
-        cerr << "target: " << nextCheckpointX << ", " << nextCheckpointY << " and " << nextCheckpointAngle << endl;
-        cerr << "hasCircuitAnalyzed: " << CircuitManager::hasAnalyzeDone() << endl;
+        // inputs for my team
+        cerr << endl;
+        cerr << "[inputs for my team]" << endl;
 
-        int targetX, targetY;
-        string targetAction;
-        myCarState.makeDecision(nextCheckpointX, nextCheckpointY, nextCheckpointDist, nextCheckpointAngle, targetX, targetY, targetAction);
-        bossCarState.makeDecision(nextCheckpointX, nextCheckpointY, nextCheckpointDist, nextCheckpointAngle, targetX, targetY, targetAction);
-        CircuitManager::printCircuit();
+        for (int i = 0; i < CAR_COUNT_PER_TEAM; ++i)
+        {          
+            int x, y;
+            int vx, vy;
+            int angle;
+            int nextCheckpointID;
+            cin >> x >> y >> vx >> vy >> angle >> nextCheckpointID;
+            myCarStatePtrs[i]->update(x, y, vx, vy, angle, nextCheckpointID);
 
-        // You have to output the target position
-        // followed by the power (0 <= thrust <= 100)
-        // i.e.: "x y thrust"
-        cout << targetX << " " << targetY << " " << targetAction << endl;
+            cerr << "\t" << i << ") " << x << ", " << y << ", " << vx << ", " << vy << ", " << angle << ", " << nextCheckpointID << endl;
+        }        
+
+        // inputs for boss team
+        cerr << endl;
+        cerr << "[inputs for boss team]" << endl;
+
+        for (int i = 0; i < CAR_COUNT_PER_TEAM; ++i)
+        {          
+            int x, y;
+            int vx, vy;
+            int angle;
+            int nextCheckpointID;
+            cin >> x >> y >> vx >> vy >> angle >> nextCheckpointID;
+            bossCarStatePtrs[i]->update(x, y, vx, vy, angle, nextCheckpointID);
+
+            cerr << "\t" << i << ") " << x << ", " << y << ", " << vx << ", " << vy << ", " << angle << ", " << nextCheckpointID << endl;
+        }                
+
+        // outputs
+        for (int i = 0; i < CAR_COUNT_PER_TEAM; ++i)
+        {            
+            int targetX, targetY;
+            string targetAction;
+            myCarStatePtrs[i]->makeDesicion(targetX, targetY, targetAction);
+            cout << targetX << " " << targetY << " " << targetAction << endl;
+        }
+
+        // this is just for debugging purpose
+        for (int i = 0; i < CAR_COUNT_PER_TEAM; ++i)
+        {            
+            int targetX, targetY;
+            string targetAction;
+            bossCarStatePtrs[i]->makeDesicion(targetX, targetY, targetAction);            
+        }
     }
+
+    for (int i = 0; i < CAR_COUNT_PER_TEAM; ++i)
+    {
+        delete myCarStatePtrs[i];
+        delete bossCarStatePtrs[i];
+    }    
 }
