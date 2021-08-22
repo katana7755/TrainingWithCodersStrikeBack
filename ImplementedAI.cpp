@@ -14,27 +14,8 @@ using namespace std;
 * Utility functions & classes
 **/
 
-struct Vector2
-{
-    float m_X;
-    float m_Y;
-};
-
-struct MapPoint
-{
-    int m_X;
-    int m_Y;    
-
-    bool operator==(const MapPoint& rhs) const
-    {
-        return m_X == rhs.m_X && m_Y == rhs.m_Y;
-    }
-
-    bool operator!=(const MapPoint& rhs) const
-    {
-        return m_X != rhs.m_X || m_Y != rhs.m_Y;
-    }    
-};
+struct Vector2;
+struct MapPoint;
 
 class MathHelper
 {
@@ -54,51 +35,92 @@ public:
         return t > 0.999f;
     }
 
-    static float getMagnitude(Vector2 vec)
+    static float rad2deg(float rad)
     {
-        return sqrt(vec.m_X * vec.m_X + vec.m_Y * vec.m_Y);
+        return rad / MATH_PI * 180.0f;
     }
 
-    static Vector2 plus(Vector2 vec1, Vector2 vec2)
-    {        
-        return Vector2 { vec1.m_X + vec2.m_X, vec1.m_Y + vec2.m_Y };
-    }
-
-    static Vector2 minus(Vector2 vec1, Vector2 vec2)
-    {        
-        return Vector2 { vec1.m_X - vec2.m_X, vec1.m_Y - vec2.m_Y };
-    }
-
-    static Vector2 multiply(Vector2 vec, float multiply)
+    static float deg2rad(float degree)
     {
-        return Vector2 {vec.m_X * multiply, vec.m_Y * multiply };
+        return degree / 180.0f * MATH_PI;        
+    }
+};
+
+struct Vector2
+{
+    float m_X;
+    float m_Y;
+
+    Vector2 operator+(const Vector2& rhs) const
+    {
+        return Vector2 { m_X + rhs.m_X, m_Y + rhs.m_Y };
     }
 
-    static Vector2 divide(Vector2 vec, float divider)
+    Vector2 operator-(const Vector2& rhs) const
     {
-        return Vector2 {vec.m_X / divider, vec.m_Y / divider };
-    }
-
-    static Vector2 getNormalizedVector(int x, int y)
-    {
-        auto vec = Vector2 { (float)x, (float)y };
-        return divide(vec, getMagnitude(vec));
-    }
-
-    static Vector2 getNormalizedVector(Vector2 vec)
-    {
-        return divide(vec, getMagnitude(vec));
+        return Vector2 { m_X - rhs.m_X, m_Y - rhs.m_Y };
     }    
 
-    static float dotProduct(Vector2 vec1, Vector2 vec2)
+    Vector2 operator*(const float multiplier) const
     {
-        return (vec1.m_X * vec2.m_X + vec1.m_Y * vec2.m_Y);
+        return Vector2 { m_X * multiplier, m_Y * multiplier };
     }
 
-    static float getAngle(Vector2 vec)
+    Vector2 operator/(const float divider) const
     {
-        return atan2(vec.m_Y, vec.m_X) * 180.0f / 3.14159265;
+        return Vector2 { m_X / divider, m_Y / divider };
     }
+
+    float getMagnitude()
+    {
+        return sqrt(m_X * m_X + m_Y * m_Y);
+    }
+
+    Vector2 getNormalized()
+    {
+        return (*this) / this->getMagnitude();
+    }       
+
+    float getTangentAngle()
+    {
+        return MathHelper::rad2deg(atan2(m_Y, m_X));
+    } 
+
+    static float dotProduct(const Vector2& lhs, const Vector2& rhs)
+    {
+        return (lhs.m_X * rhs.m_X + lhs.m_Y * rhs.m_Y);
+    }   
+};
+
+struct MapPoint
+{
+    int m_X;
+    int m_Y;    
+
+    Vector2 toVector()
+    {
+        return Vector2 { (float)m_X, (float)m_Y };
+    }  
+
+    bool operator==(const MapPoint& rhs) const
+    {
+        return m_X == rhs.m_X && m_Y == rhs.m_Y;
+    }
+
+    bool operator!=(const MapPoint& rhs) const
+    {
+        return m_X != rhs.m_X || m_Y != rhs.m_Y;
+    }    
+
+    MapPoint operator+(const MapPoint& rhs) const
+    {
+        return MapPoint { m_X + rhs.m_X, m_Y + rhs.m_Y };
+    }
+
+    MapPoint operator-(const MapPoint& rhs) const
+    {
+        return MapPoint { m_X - rhs.m_X, m_Y - rhs.m_Y };
+    }    
 };
 
 class TimeManager
@@ -146,9 +168,9 @@ struct Circuit
 
         for (int i = 0; i < size; ++i)
         {
-            auto diff = Vector2 { (float)(m_Checkpoints[i].m_X - rhs.m_Checkpoints[i].m_X), (float)(m_Checkpoints[i].m_Y - rhs.m_Checkpoints[i].m_Y) };
+            auto diff = (m_Checkpoints[i] - rhs.m_Checkpoints[i]).toVector();
 
-            if (MathHelper::getMagnitude(diff) > 50.0f)
+            if (diff.getMagnitude() > 50.0f)
             {
                 return false;
             }
@@ -422,10 +444,10 @@ public:
         {   
             auto prevDir = m_Dir;
             m_Dir = Vector2 { (float)(x - m_Pos.m_X), (float)(y - m_Pos.m_Y) };
-            m_Speed = MathHelper::getMagnitude(m_Dir) / TimeManager::getDeltaTime();
+            m_Speed = m_Dir.getMagnitude() / TimeManager::getDeltaTime();
             m_Speed = max(m_Speed, 0.001f);
-            m_Dir = MathHelper::getNormalizedVector(m_Dir);
-            m_AngularSpeed = MathHelper::getAngle(MathHelper::minus(m_Dir, prevDir)) / TimeManager::getDeltaTime();
+            m_Dir = m_Dir.getNormalized();
+            m_AngularSpeed = (m_Dir - prevDir).getTangentAngle() / TimeManager::getDeltaTime();
             m_MaxSpeed = max(m_MaxSpeed, m_Speed);
             m_MaxAngularSpeed = max(m_MaxAngularSpeed, abs(m_AngularSpeed));
         }
@@ -473,27 +495,27 @@ public:
         {
             outTargetX = checkPointX;
             outTargetY = checkPointY;
-            distFactor = max(distanceToNextCheckpoint * cos(angleToNextCheckpoint / 180.0f * MATH_PI), 0.0f);
+            distFactor = max(distanceToNextCheckpoint * cos(MathHelper::deg2rad(angleToNextCheckpoint)), 0.0f);
             distFactor = (m_Speed > 0.001f) ? clamp(distFactor / (m_Speed * 10.0f), 0.0f, 1.0f) : 1.0f;
 
             MapPoint currentCheckpoint = MapPoint { checkPointX, checkPointY };
-            Vector2 toCurrent = MathHelper::getNormalizedVector(currentCheckpoint.m_X - m_Pos.m_X, currentCheckpoint.m_Y - m_Pos.m_Y);
+            Vector2 toCurrent = (currentCheckpoint - m_Pos).toVector().getNormalized();
 
             if (CircuitManager::hasAnalyzeDone() && !CircuitManager::isTargettingLastCheckpoint())
             {   
                 MapPoint nextCheckpoint = MapPoint { checkPointX, checkPointY };
-                float movementCosine = max(MathHelper::dotProduct(m_Dir, toCurrent), 0.0f);
+                float movementCosine = max(Vector2::dotProduct(m_Dir, toCurrent), 0.0f);
 
-                if (movementCosine > cos(MATH_PI * 30.0f / 180.0f) && distanceToNextCheckpoint < (m_Speed * 10.0f))
+                if (movementCosine > cos(MathHelper::deg2rad(30.0f)) && distanceToNextCheckpoint < (m_Speed * 10.0f))
                 {                    
                     isNext = true;
                     currentCheckpoint = CircuitManager::getCheckpointFromCurrent(1);
                     nextCheckpoint = CircuitManager::getCheckpointFromCurrent(2);
-                    toCurrent = MathHelper::getNormalizedVector(currentCheckpoint.m_X - m_Pos.m_X, currentCheckpoint.m_Y - m_Pos.m_Y);
+                    toCurrent = (currentCheckpoint - m_Pos).toVector().getNormalized();
 
-                    auto diff = Vector2 { (float)(currentCheckpoint.m_X - m_Pos.m_X), (float)(currentCheckpoint.m_Y - m_Pos.m_Y) };
-                    distanceToNextCheckpoint = MathHelper::getMagnitude(diff);
-                    distFactor = max(distanceToNextCheckpoint * MathHelper::dotProduct(m_Dir, toCurrent), 0.0f);
+                    auto diff = (currentCheckpoint - m_Pos).toVector();
+                    distanceToNextCheckpoint = diff.getMagnitude();
+                    distFactor = max(distanceToNextCheckpoint * Vector2::dotProduct(m_Dir, toCurrent), 0.0f);
                     distFactor = (m_Speed > 0.001f) ? clamp(distFactor / (m_Speed * 10.0f), 0.0f, 1.0f) : 1.0f;                    
                 }
                 else
@@ -501,10 +523,10 @@ public:
                     nextCheckpoint = CircuitManager::getCheckpointFromCurrent(1);
                 }
 
-                auto toCurrentHalf = MathHelper::plus(toCurrent, m_Dir);
-                toCurrentHalf = MathHelper::getNormalizedVector(toCurrent);
-                Vector2 toNext = MathHelper::getNormalizedVector(nextCheckpoint.m_X - currentCheckpoint.m_X, nextCheckpoint.m_Y - currentCheckpoint.m_Y);
-                minThrust = max(MathHelper::dotProduct(toCurrentHalf, toNext) * maxThrust, 0.0f);
+                auto halfVector = toCurrent + m_Dir;
+                halfVector = halfVector.getNormalized();
+                Vector2 toNext = (nextCheckpoint - currentCheckpoint).toVector().getNormalized();
+                minThrust = max(Vector2::dotProduct(halfVector, toNext) * maxThrust, 0.0f);
             }            
 
             // Use boost in the last lap
@@ -521,8 +543,8 @@ public:
             }    
 
             // Calibrate target position
-            auto adjustment = MathHelper::minus(MathHelper::multiply(toCurrent, MathHelper::dotProduct(m_Dir, toCurrent)), m_Dir);
-            adjustment = MathHelper::multiply(adjustment, m_Speed * 10.0);
+            auto adjustment = (toCurrent * Vector2::dotProduct(m_Dir, toCurrent)) - m_Dir;
+            adjustment = adjustment * m_Speed * 10.0f;
             outTargetX = currentCheckpoint.m_X + adjustment.m_X;
             outTargetY = currentCheckpoint.m_Y + adjustment.m_Y;             
         }
